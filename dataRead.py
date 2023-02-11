@@ -43,6 +43,7 @@ class LidarData():
         
         for p in range(3, len(self.data['angles'])-3):
             
+            # ------ not sure what I'm doing here... ----------------
             # TODO: implement some sort of filter to remove outliers
             if (p > len(self.data['angles']) - 3) : break
             sample = self.data['distances'][p-3:p+3]
@@ -50,7 +51,7 @@ class LidarData():
             if abs(self.data['distances'][p]-statistics.mean(sample)) < std:
                 angles.append(self.data['angles'][p])
                 distances.append(self.data['distances'][p])
-            # filter END
+            # ------------ filter END -------------------------------
                 
         self.ax.clear() # clear current plot
         plt.plot(angles, distances, ".")    # plot the points
@@ -66,7 +67,7 @@ class LidarData():
             try: 
                 if self.ser.in_waiting > 0:
                     
-                    try: # try read serial inputs
+                    try: # try read serial inputs; if unsuccessful, ignore the current input data
                         line = self.ser.readline().decode().rstrip()
                         sensorData = line.split('\t')  
                         
@@ -77,7 +78,8 @@ class LidarData():
                     if len(sensorData) == self.DATA_LENGTH:
                         
                         for i in range(2,6):    # split into four data points
-                            try:                               
+                            try:           
+                                # note: angles comes in increment of 4 degrees as each packet contains 4 readings                    
                                 angle = (int(sensorData[0]) + i - 1) * math.pi / 180  # angle in radians
                                 dist = float(sensorData[i])   # distance in mm
                                 print(f'speed : {int(sensorData[1])} RPM, angle : {round(angle * 180 / math.pi)}, dist : {round(dist)}')
