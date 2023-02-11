@@ -150,6 +150,8 @@ void decodePacket(uint8_t packet[], int packetSize) {
         else if (i == 2) {
             int speed = 0x00; 
             speed |= ( (packet[3]<<8) | packet[2]);     
+
+            // an attempt to smoothen the speed readings since they sometimes spikes due to unknown issue
             currentSpeed = abs(speed/64-currentSpeed) > 100 ? currentSpeed*0.95 + (speed/64)*0.05: speed/64; 
             // Serial.print(currentSpeed);
             data[data_idx++] = currentSpeed;
