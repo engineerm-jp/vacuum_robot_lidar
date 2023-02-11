@@ -37,24 +37,24 @@ PACKET STRUCTURE
 #define MOTOR_SPEED 250 // motor speed in RPM
 
 
-const unsigned char HEAD_BYTE = 0xFA; // start byte of the packet
-unsigned int packetIndex = 0;   // packet index
 uint8_t packet[PACKET_SIZE];    // packet buffer
-uint8_t receivedByte = 0;       // received byte
+const unsigned char HEAD_BYTE = 0xFA;   // start byte of the packet
+unsigned int packetIndex      = 0;      // packet index
+uint8_t receivedByte    = 0;    // received byte
 uint8_t lowStrengthFlag = 0; 
-bool PACKET_OK = true;          // if the packet is valid
+bool PACKET_OK  = true;         // if the packet is valid
 bool waitPacket = true;         // true if waiting for a packet
 
 
 // PID control variables
 double proportionalTerm = 0;
-double derivativeTerm = 0; 
-double integralTerm = 0;
-double previousSpeed = 0;
+double derivativeTerm   = 0; 
+double integralTerm     = 0;
+double previousSpeed    = 0;
 
-int currentSpeed = 0; 
-int baseSpeed = 0; 
-double t_sample = 64*65536/16000000.0; // pre-scaler of 64
+int currentSpeed    = 0; 
+int baseSpeed       = 0; 
+double t_sample     = 64*65536/16000000.0; // pre-scaler of 64
 double kp = 2;
 double ki = 0.3; 
 double kd = 0.3;
@@ -67,25 +67,27 @@ int speed = 0;
 // uint16_t dist_1, dist_2, dist_3, dist_4 = 0, 0, 0, 0; 
 SoftwareSerial lidarSensor =  SoftwareSerial(RX_PIN, 3);
 void setup() {
+    // setup TIMER0 -> trigger timer ISR every approx. 0.2s
     noInterrupts();     
     TCCR1A = 0;
     TCCR1B = 0;
     TCCR1B |= (1 << CS11)|(1 << CS10);   
     TIMSK1 |= (1 << TOIE1); 
     interrupts();
-  
+    
+    // setup serial LiDAR -> Arduino
     lidarSensor.begin(BAUDRATE_SENSOR);
 
-    // setup serial interface
+    // setup serial Arduino -> PC
     pinMode(RX_PIN, INPUT);
     Serial.begin(BAUDRATE);
 
     // setup motor
-    analogWrite(MOTOR_PIN,MAX_POWER);
+    analogWrite(MOTOR_PIN,MAX_POWER);   // kick start motor with MAX power
     delay(2000);
     analogWrite(MOTOR_PIN,125);
     // initialize packet buffer
-    for (int idx = 0; idx < PACKET_SIZE; idx++) packet[idx] = 0;
+    for (int idx = 0; idx < PACKET_SIZE; idx++) packet[idx] = 0;    // initialize packet buffer
 }
 
 
@@ -124,11 +126,12 @@ ISR(TIMER1_OVF_vect)
     motorSpeedPID(MOTOR_SPEED, currentSpeed, 0.262, kp, ki, kd);
 }
 
-int decodePacket(uint8_t packet[], int packetSize) {
-    int data_idx = 0; 
-    int data[DATA_SIZE]; // [angle, speed, distance 1, distance 2, distance 3, distance 4, checksum]
+int data[DATA_SIZE]; // [angle, speed, distance 1, distance 2, distance 3, distance 4, checksum]
 
-    for (int idx = 0; idx < 7; idx++) data[idx] = 0;  // initialise data array
+void decodePacket(uint8_t packet[], int packetSize) {
+    int data_idx = 0; 
+
+    for (int idx = 0; idx < DATA_SIZE; idx++) data[idx] = 0;  // initialise data array
 
     for (int i = 0; i < packetSize; i++){
       // Serial.print("0x"); Serial.print(packet[i]); Serial.print('\t');
@@ -139,7 +142,7 @@ int decodePacket(uint8_t packet[], int packetSize) {
         }
         else if (i == 1) {
             uint16_t angle = (packet[i] - 0xA0) * 4;  // convert to values between 0 ~ 360
-            if (angle > 360) return -1; 
+            if (angle > 360) return; 
             // Serial.print(angle); 
             data[data_idx++] = angle;
             // Serial.print('\t');
@@ -175,7 +178,7 @@ int decodePacket(uint8_t packet[], int packetSize) {
 
     uint16_t chksum = checksum(packet, (unsigned int)(packet[PACKET_SIZE-2] + (packet[PACKET_SIZE-1]<<8)),PACKET_SIZE-2);
     data[data_idx++] = chksum; 
-    return data;
+    
 }
 
 int sendPacket(uint8_t packet[], int packetSize) { // send a packet of size packetSize
@@ -192,17 +195,10 @@ uint16_t checksum(uint8_t packet[], uint16_t sum, uint8_t size)
     uint16_t data[size/2]; 
     uint8_t  sensorData[size]; 
 
-    for (int i = 0; i < size; i++) {
-        sensorData[i] = packet[i];
-    }
-
-    for (int i = 0; i < size/2; i++) data[i] = 0; // initalize array
+    for (int i = 0; i < size; i++) sensorData[i] = packet[i];
 
     for (int i = 0; i < size/2; i++) {
         data[i] = ((sensorData[i*2+1] << 8) + sensorData[i*2]);
-    }
-
-    for (int i = 0; i < size/2; i++) {
         chk32 = (chk32 << 1) + data[i];
     }
 
@@ -221,6 +217,8 @@ void moveMotor(unsigned int motorPin, unsigned int power) {
     analogWrite(motorPin, power);   // send PWM signal to the motor controller
 }
 
+
+// a simple PID controller for keeping the motor speed to a specified RPM value
 int motorSpeedPID(int targetSpeed, int currentSpeed, double deltaT, double kp, double ki, double kd) {
 
     proportionalTerm = targetSpeed - currentSpeed;  // current error to the target speed
