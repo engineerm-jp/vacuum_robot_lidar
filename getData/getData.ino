@@ -37,6 +37,7 @@ PACKET STRUCTURE
 #define MOTOR_SPEED 250 // motor speed in RPM
 
 
+int data[DATA_SIZE]; // [angle, speed, distance 1, distance 2, distance 3, distance 4, checksum]
 uint8_t packet[PACKET_SIZE];    // packet buffer
 const unsigned char HEAD_BYTE = 0xFA;   // start byte of the packet
 unsigned int packetIndex      = 0;      // packet index
@@ -113,7 +114,8 @@ void loop() {
                 
                 if (packetIndex >= PACKET_SIZE) { // if packet buffer is full
                     waitPacket = true; // wait for a new packet
-                    decodePacket(packet, PACKET_SIZE); // process the packet       
+                    decodePacket(packet, PACKET_SIZE); // process the packet
+                    sendData(data, DATA_SIZE);       
                 }
             }
         }
@@ -126,7 +128,6 @@ ISR(TIMER1_OVF_vect)
     motorSpeedPID(MOTOR_SPEED, currentSpeed, 0.262, kp, ki, kd);
 }
 
-int data[DATA_SIZE]; // [angle, speed, distance 1, distance 2, distance 3, distance 4, checksum]
 
 void decodePacket(uint8_t packet[], int packetSize) {
     int data_idx = 0; 
@@ -183,9 +184,9 @@ void decodePacket(uint8_t packet[], int packetSize) {
     
 }
 
-int sendPacket(uint8_t packet[], int packetSize) { // send a packet of size packetSize
-  for (int i = 0; i < packetSize; i++) {
-    Serial.print(packet[i]); 
+int sendData(int data[], int dataSize) { // send a packet of size packetSize
+  for (int i = 0; i < dataSize; i++) {
+    Serial.print(data[i]); 
     Serial.print('\t'); 
   }
   Serial.println();  
