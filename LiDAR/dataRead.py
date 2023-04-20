@@ -4,33 +4,33 @@ import statistics
 import math
 
 class LidarData():
+    
     def __init__(self):        
-        self.DATA_LENGTH = 7    # data length 
-        self.MAX_DISTANCE = 3000
-        self.MIN_DISTANCE = 100
-        self.port = 'COM7'  # SPECIFY serial port 
+        self.DATA_LENGTH = 7        # data length : angle, speed, distance 1 - 4, checksum
+        self.MAX_DISTANCE = 3000    # in mm
+        self.MIN_DISTANCE = 100     # in mm
+        self.port = 'COM7'          # SPECIFY serial port 
         self.MAX_DATA_SIZE = 360    # resolution : 1 degree
-        # sensor data 
-        self.data = {
+        self.ser = None
+        self.BAUDRATE = 115200
+
+        self.data = {   # sensor data 
             'angles'    : [],
             'distances' : [],
             'speed'     : [],
-            'signal_strength' : [],
+            'signal_strength' : [], # TODO:
             'checksum'  : [] 
         }
         
-        # setup visualization
+        # setup plot
         self.fig, self.ax = plt.subplots(subplot_kw={'projection': 'polar'})
         self.ax.set_rmax(300)
         
-        self.ser = None
+        self.connectSerial(self.port, self.BAUDRATE)   # setup serial communication
         
-        # setup serial communication
-        self.connectSerial(self.port)
-        
-    def connectSerial(self, port: str) -> bool:
+    def connectSerial(self, port: str, baudrate: int) -> bool:
         try: 
-            self.ser = serial.Serial(port, 115200, timeout=1)
+            self.ser = serial.Serial(port, baudrate, timeout=1)
             self.ser.reset_input_buffer()
             print(f'Serial connection established @ {port}')
             return True # return True to confirm connection
@@ -85,7 +85,8 @@ class LidarData():
                                 print(f'speed : {int(sensorData[1])} RPM, angle : {round(angle * 180 / math.pi)}, dist : {round(dist)}')
                             except: continue
                             
-                            if dist > self.MIN_DISTANCE and dist < self.MAX_DISTANCE:
+                            # if the data is valid, update sensor data
+                            if dist >= self.MIN_DISTANCE and dist <= self.MAX_DISTANCE:
                                 
                                 # store angular data in radians
                                 self.data['angles'].append(angle)
@@ -99,7 +100,7 @@ class LidarData():
                                 # store speed data in RPM
                                 self.data['speed'].append(sensorData[1])
                                 
-                            if len(self.data['angles']) == self.MAX_DATA_SIZE: 
+                            if len(self.data['angles']) == self.MAX_DATA_SIZE:  # if enough data is available, plot data
                                 self.plotData()
                                 
             except KeyboardInterrupt:
